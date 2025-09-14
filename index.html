@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Excel → Interactive Dashboard (Enhanced UI)</title>
+    <style>
+      :root {
+        --accent: #2563eb;
+        --accent-light: #dbeafe;
+        --bg: #f9fafb;
+        --card: #ffffff;
+        --border: #e5e7eb;
+        --text: #111827;
+        --muted: #6b7280;
+      }
+      body {
+        font-family: Inter, system-ui, Segoe UI, Arial;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        padding: 16px 24px;
+        background: var(--accent);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      .container {
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .card {
+        border: 1px solid var(--border);
+        padding: 16px;
+        border-radius: 12px;
+        background: var(--card);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+      .controls {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      select,
+      input,
+      button {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+      }
+      select:focus,
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-light);
+      }
+      button {
+        cursor: pointer;
+        transition: background 0.2s, transform 0.1s;
+      }
+      .btn {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+      }
+      .btn:hover {
+        background: #1e40af;
+      }
+      .btn.secondary {
+        background: #6b7280;
+      }
+      .btn.secondary:hover {
+        background: #4b5563;
+      }
+      .fileLabel {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 2px dashed var(--border);
+        cursor: pointer;
+        background: #f3f4f6;
+        transition: border 0.2s, background 0.2s;
+      }
+      .fileLabel:hover {
+        border-color: var(--accent);
+        background: var(--accent-light);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 12px;
+      }
+      th,
+      td {
+        border: 1px solid #eee;
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 13px;
+      }
+      th {
+        background: #f9fafb;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .small {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      #chartWrap {
+        height: 320px;
+      }
+      .footer {
+        margin-top: 20px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .toolbar button {
+        transform: scale(1);
+      }
+      .toolbar button:active {
+        transform: scale(0.96);
+      }
+      .fadeIn {
+        animation: fade 0.4s ease-in-out;
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+    <!-- CDNs -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>📊 Excel → Interactive Dashboard</h1>
+      <span class="small">Upload • Filter • Pivot • Visualize</span>
+    </header>
+
+    <div class="container">
+      <div class="toolbar">
+        <label class="fileLabel">
+          Choose file (Excel/CSV)
+          <input
+            id="fileInput"
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            style="display: none"
+          />
+        </label>
+        <button id="clearBtn" class="btn secondary">Clear</button>
+      </div>
+
+      <div class="controls card fadeIn">
+        <div>
+          <div class="small">🔎 Filter</div>
+          <select id="filterCol">
+            <option value="">-- select column --</option>
+          </select>
+          <input id="filterValue" placeholder="value" />
+          <button id="applyFilter" class="btn">Apply</button>
+        </div>
+
+        <div>
+          <div class="small">📑 Pivot</div>
+          <select id="rowSelect">
+            <option value="">-- row --</option>
+          </select>
+          <select id="colSelect">
+            <option value="">-- column --</option>
+          </select>
+          <select id="valSelect">
+            <option value="">-- value --</option>
+          </select>
+          <select id="aggSelect">
+            <option value="sum">Sum</option>
+            <option value="count">Count</option>
+            <option value="avg">Average</option>
+          </select>
+          <button id="makePivot" class="btn">Create</button>
+        </div>
+
+        <div>
+          <div class="small">📈 Chart</div>
+          <select id="chartType">
+            <option value="bar">Bar</option>
+            <option value="line">Line</option>
+            <option value="pie">Pie</option>
+          </select>
+          <button id="drawChart" class="btn">Draw</button>
+        </div>
+
+        <div>
+          <div class="small">⬇️ Export</div>
+          <button id="downloadCsv" class="btn">Download CSV</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card fadeIn" style="overflow: auto; max-height: 520px">
+          <div class="small">Data preview (200 rows)</div>
+          <div id="tableWrap"></div>
+        </div>
+
+        <div>
+          <!-- ✅ Pivot Output with filter controls -->
+          <div class="card fadeIn" style="height: auto; margin-bottom: 20px">
+            <div class="small">Pivot output</div>
+            <div style="margin: 8px 0">
+              <select id="pivotFilterCol">
+                <option value="">-- select column --</option>
+              </select>
+              <input id="pivotFilterValue" placeholder="filter value" />
+              <button id="applyPivotFilter" class="btn secondary">
+                Filter
+              </button>
+              <button id="clearPivotFilter" class="btn secondary">Clear</button>
+            </div>
+            <div
+              id="pivotWrap"
+              style="overflow: auto; max-height: 500px; margin-top: 8px"
+            ></div>
+          </div>
+
+          <div class="card fadeIn" style="margin-top: 20px">
+            <div class="small">Chart</div>
+            <div id="chartWrap">
+              <canvas id="myChart" width="400" height="220"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        ✨ Tip: Hover cards animate, filters refresh instantly, pivot + chart
+        are interactive. All client-side.
+      </div>
+    </div>
+
+    <script>
+      // ... (all your existing variables + functions remain unchanged above)
+
+      // ✅ REPLACE THIS FUNCTION ONLY
+      function populatePivotFilterOptions(pivot, rowField, colField) {
+        pivotFilterCol.innerHTML = "";
+
+        // Add dynamic row + col fields
+        if (rowField) {
+          pivotFilterCol.insertAdjacentHTML(
+            "beforeend",
+            `<option value="${rowField}">${rowField}</option>`
+          );
+        }
+        pivot.cols.forEach((c) => {
+          pivotFilterCol.insertAdjacentHTML(
+            "beforeend",
+            `<option value="${c}">${c}</option>`
+          );
+        });
+
+        // ✅ Fixed business fields
+        const fixedFields = [
+          "Sales Month",
+          "Sales Week",
+          "Service Scope",
+          "Group Code",
+          "CIF/FOB",
+          "Contract Type Name",
+          "Shipper Name",
+          "Notify Party Name",
+          "Consignee Name",
+          "Actual Customer Name",
+          "Contract Number",
+          "Contract Customer Name",
+          "Booking Number",
+          "Booking Status Description",
+          "POR Country Code",
+          "POR Location Code",
+        ];
+        fixedFields.forEach((f) => {
+          pivotFilterCol.insertAdjacentHTML(
+            "beforeend",
+            `<option value="${f}">${f}</option>`
+          );
+        });
+      }
+    </script>
+  </body>
+</html>
